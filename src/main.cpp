@@ -3,19 +3,16 @@
 
 int main() {
     Board myBoard;
+    // Manually set up a test state
+    myBoard.clearBoard(); // You might need to write this small helper to set all pieceBB to 0
+    myBoard.pieceBB[3] = 1ULL << 27; // White Rook on d4
+    myBoard.pieceBB[6] = 1ULL << 43; // Black Pawn on d6 (Blocks the Rook's North ray)
+    myBoard.updateCombinedBitboards();
+    myBoard.printBitboard(myBoard.allPieces);
+    myBoard.makeMove(27,43,3);
+    // myBoard.updateCombinedBitboards();
 
-    // Test 1: Knight in the middle (d4 = index 27)
-    // We expect a full "circle" of 8 moves.
-    Bitboard b4bishop = 1ULL << 27; 
-    std::cout << "Bishop on d4 (Middle):" << std::endl;
-    myBoard.printBitboard(myBoard.getBishopMoves(27));
-
-    // Test 2: Knight on the edge (a1 = index 0)
-    // We expect ONLY 2 moves (b3 and c2). 
-    // If you see more than 2, your masks are broken!
-    // Bitboard edgeKnight = 1ULL << 0;
-    // std::cout << "Knight on a1 (Corner):" << std::endl;
-    // myBoard.printBitboard(myBoard.getKnightMoves(edgeKnight));
+    myBoard.printBitboard(myBoard.whitePieces);
 
     return 0;
 }

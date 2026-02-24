@@ -55,6 +55,13 @@ public:
         allPieces = whitePieces | blackPieces;
     }
 
+    void clearBoard(){
+        for ( auto &i : pieceBB ){
+            i = 0;
+        }
+        updateCombinedBitboards();
+    }
+
     // A helper function to print a bitboard (dibug))
     void printBitboard(Bitboard bb) {
         for (int rank = 7; rank >= 0; rank--) {
@@ -113,38 +120,59 @@ public:
         return moves;
     }
 
-    Bitboard getRookMoves(int square) {
-    Bitboard moves = 0;
-    
-    // North (+8)
-    for (int s = square + 8; s < 64; s += 8) moves |= (1ULL << s);
-    // South (-8)
-    for (int s = square - 8; s >= 0; s -= 8) moves |= (1ULL << s);
-    // East (+1) - Must stop at File H
-    for (int s = square + 1; s < 64 && (s % 8 != 0); s++) moves |= (1ULL << s);
-    // West (-1) - Must stop at File A
-    for (int s = square - 1; s >= 0 && (s % 8 != 7); s--) moves |= (1ULL << s);
-
-    return moves;
+    Bitboard getRookMoves(int square, Bitboard allOccupancy) {
+        Bitboard moves = 0;
+        // North (+8)
+        for (int s = square + 8; s < 64; s += 8) {
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // South (-8)
+        for (int s = square - 8; s >= 0; s -= 8) {
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // East (+1) - Must stop at File H
+        for (int s = square + 1; s < 64 && (s % 8 != 0); s++){
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // West (-1) - Must stop at File A
+        for (int s = square - 1; s >= 0 && (s % 8 != 7); s--) {
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        return moves;
     }
 
-    Bitboard getBishopMoves(int square) {
-    Bitboard moves = 0;
-    
-    // North-East (+9)
-    for (int s = square + 9; s < 64 && (s % 8 != 0); s += 9) moves |= (1ULL << s);
-    // North-West (+7)
-    for (int s = square + 7; s < 64 && (s % 8 != 7); s += 7) moves |= (1ULL << s);
-    // South-East (-7)
-    for (int s = square - 7; s >= 0 && (s % 8 != 0); s -= 7) moves |= (1ULL << s);
-    // South-West (-9)
-    for (int s = square - 9; s >= 0 && (s % 8 != 7); s -= 9) moves |= (1ULL << s);
-
-    return moves;
+    Bitboard getBishopMoves(int square, Bitboard allOccupancy) {
+        Bitboard moves = 0;
+        
+        // North-East (+9)
+        for (int s = square + 9; s < 64 && (s % 8 != 0); s += 9){
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // North-West (+7)
+        for (int s = square + 7; s < 64 && (s % 8 != 7); s += 7){
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // South-East (-7)
+        for (int s = square - 7; s >= 0 && (s % 8 != 0); s -= 7){
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        // South-West (-9)
+        for (int s = square - 9; s >= 0 && (s % 8 != 7); s -= 9){
+            moves |= (1ULL << s);
+            if ((1ULL << s) & allOccupancy) break; // Stop if we hit any piece
+        }
+        return moves;
     }
     
-    Bitboard getQueenMoves(int square) {
-    return getRookMoves(square) | getBishopMoves(square);
+    Bitboard getQueenMoves(int square, Bitboard allOccupancy) {
+    return getRookMoves(square, allOccupancy) | getBishopMoves(square, allOccupancy);
     }
 
     Bitboard getWhitePawnMoves(Bitboard pawn) {
@@ -185,7 +213,76 @@ public:
 
         return moves;
     }
+    
     Bitboard getPawnMoves(Bitboard pawn, bool isWhite) {
         return isWhite ? getWhitePawnMoves(pawn) : getBlackPawnMoves(pawn);
+    }
+
+    void generateAllMoves() {
+        Bitboard friendly = whiteToMove ? whitePieces : blackPieces;
+        Bitboard enemy = whiteToMove ? blackPieces : whitePieces;
+        Bitboard allMoves = 0;
+        Bitboard allOccupancy = whitePieces | blackPieces;
+
+        // We need to iterate through each piece type (0-5 for White, 6-11 for Black)
+        int start = whiteToMove ? 0 : 6;
+        int end = start + 6;
+
+        for (int type = start; type < end; type++) {
+            Bitboard pieces = pieceBB[type];
+            
+            // While there are still pieces of this type on the board
+            while (pieces) {
+                int sq = getLSBIndex(pieces); // Get the index of the first piece
+                Bitboard moves = 0;
+
+                // Call the correct logic based on piece type
+                // Note: type % 6 gives us 0=Pawn, 1=Knight, etc. regardless of color
+                int pieceType = type % 6;
+                if (pieceType == 1) moves = getKnightMoves(1ULL << sq);
+                else if (pieceType == 2) moves = getBishopMoves(sq,allOccupancy);
+                else if (pieceType == 3) moves = getRookMoves(sq,allOccupancy);
+                else if (pieceType == 4) moves = getQueenMoves(sq,allOccupancy);
+                else if (pieceType == 5) moves = getKingMoves(1ULL << sq);
+                else if (pieceType == 0) moves = getPawnMoves(1ULL << sq, whiteToMove);
+                // Apply the "No Friendly Fire" filter
+                moves &= ~friendly;
+                
+                allMoves |= moves;
+                
+                // Remove the piece we just processed so we can find the next one
+                pieces &= (pieces - 1); 
+            }
+        }
+        
+        std::cout << (whiteToMove ? "White" : "Black") << " total reach:" << std::endl;
+        printBitboard(allMoves);
+    }
+
+    void makeMove(int from, int to, int pieceType) {
+        Bitboard fromBB = 1ULL << from;
+        Bitboard toBB = 1ULL << to;
+        Bitboard moveMask = fromBB | toBB;
+
+        // 1. Capture Logic: If the 'to' square has an enemy, we must delete it
+        Bitboard enemyPieces = whiteToMove ? blackPieces : whitePieces;
+        if (toBB & enemyPieces) {
+            // Find which specific enemy piece is there and 'pop' it
+            int start = whiteToMove ? 6 : 0; // If white moves, look at black pieces (6-11)
+            int end = start + 6;
+            for (int i = start; i < end; i++) {
+                if (pieceBB[i] & toBB) {
+                    pieceBB[i] ^= toBB; // XOR again to flip the '1' to '0'
+                    break;
+                }
+            }
+        }
+
+        // 2. Move our piece: Toggle 'from' off and 'to' on
+        pieceBB[pieceType] ^= moveMask;
+
+        // 3. Update the state
+        updateCombinedBitboards();
+        whiteToMove = !whiteToMove; // Switch the turn!
     }
 };
